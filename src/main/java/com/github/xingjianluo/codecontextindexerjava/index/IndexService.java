@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -45,8 +46,14 @@ public class IndexService {
 
     /**
      * 刷新指定目录的索引。串行执行；完成后返回相对上一快照的差异报告。
+     *
+     * <p>rootDir 先做参数校验（不存在 / 不是目录 / 不可读分别给出可区分原因），
+     * 校验或扫描失败时抛出异常，已发布快照保持原样，检索结果不受影响。
+     *
+     * @throws InvalidRootDirException rootDir 不存在、不是目录或不可读
      */
     public RefreshReport refresh(Path rootDir) {
+        validateRootDir(rootDir);
         refreshLock.lock();
         try {
             IndexSnapshot previous = snapshot.get();
@@ -94,6 +101,22 @@ public class IndexService {
             return report;
         } finally {
             refreshLock.unlock();
+        }
+    }
+
+    /** 校验 rootDir：不存在、不是目录、不可读三种情况分别抛出可区分原因。 */
+    private static void validateRootDir(Path rootDir) {
+        if (!Files.exists(rootDir)) {
+            throw new InvalidRootDirException(InvalidRootDirException.Reason.NOT_FOUND,
+                    rootDir.toString(), "目录不存在: " + rootDir);
+        }
+        if (!Files.isDirectory(rootDir)) {
+            throw new InvalidRootDirException(InvalidRootDirException.Reason.NOT_A_DIRECTORY,
+                    rootDir.toString(), "路径不是目录: " + rootDir);
+        }
+        if (!Files.isReadable(rootDir)) {
+            throw new InvalidRootDirException(InvalidRootDirException.Reason.UNREADABLE,
+                    rootDir.toString(), "目录不可读: " + rootDir);
         }
     }
 }

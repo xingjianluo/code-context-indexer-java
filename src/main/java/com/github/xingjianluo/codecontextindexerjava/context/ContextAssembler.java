@@ -25,6 +25,11 @@ public class ContextAssembler {
     /** 片段间分隔符，计入预算。 */
     static final String SEPARATOR = "\n---\n";
 
+    /** 命中数超过返回上限时的保留/丢弃规则说明（对外可见、稳定不变）。 */
+    static final String RETENTION_RULE =
+            "命中按排名保留前 maxResults 条（得分降序，并列按 path、chunkIndex 字典序），"
+                    + "丢弃排名靠后的命中；排名为纯函数，重复查询结论一致";
+
     public ContextResult assemble(String query, SearchService.SearchOutcome outcome, int budgetChars) {
         if (budgetChars < 0) {
             throw new IllegalArgumentException("预算不能为负: " + budgetChars);
@@ -46,7 +51,13 @@ public class ContextAssembler {
                         hit.chunk().path(), hit.chunk().chunkIndex(), reason);
             }
         }
+        if (outcome.truncated()) {
+            log.info("命中数 {} 超过返回上限 {}，按规则截断：{}", outcome.totalHits(),
+                    outcome.maxResults(), RETENTION_RULE);
+        }
         return new ContextResult(query, budgetChars, used,
+                outcome.totalHits(), outcome.maxResults(), outcome.truncated(),
+                RETENTION_RULE,
                 List.copyOf(included), List.copyOf(trimmed));
     }
 }
