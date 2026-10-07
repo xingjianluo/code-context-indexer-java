@@ -25,6 +25,11 @@ public class ContextAssembler {
     /** 片段间分隔符，计入预算。 */
     static final String SEPARATOR = "\n---\n";
 
+    /** 命中数超限时的截断规则说明（固定文案，便于调用方与测试核对）。 */
+    static final String HIT_LIMIT_RULE =
+            "命中数超过上限时按排名（得分降序，并列按 path/chunkIndex 字典序）"
+                    + "保留前 hitLimit 条，丢弃排名靠后的其余命中";
+
     public ContextResult assemble(String query, SearchService.SearchOutcome outcome, int budgetChars) {
         if (budgetChars < 0) {
             throw new IllegalArgumentException("预算不能为负: " + budgetChars);
@@ -47,6 +52,8 @@ public class ContextAssembler {
             }
         }
         return new ContextResult(query, budgetChars, used,
+                outcome.totalHits(), outcome.returnedHits(), outcome.hitLimit(),
+                outcome.truncated(), HIT_LIMIT_RULE,
                 List.copyOf(included), List.copyOf(trimmed));
     }
 }

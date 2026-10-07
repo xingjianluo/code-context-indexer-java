@@ -45,8 +45,13 @@ public class IndexService {
 
     /**
      * 刷新指定目录的索引。串行执行；完成后返回相对上一快照的差异报告。
+     *
+     * rootDir 先经校验（不存在 / 不是目录 / 不可读分别抛出
+     * {@link InvalidRootDirException} 的对应原因）；校验或扫描失败时
+     * 不触碰已发布快照，旧索引继续可用于检索。
      */
     public RefreshReport refresh(Path rootDir) {
+        validateRootDir(rootDir);
         refreshLock.lock();
         try {
             IndexSnapshot previous = snapshot.get();
@@ -94,6 +99,19 @@ public class IndexService {
             return report;
         } finally {
             refreshLock.unlock();
+        }
+    }
+
+    /** 校验 rootDir：不存在、非目录、不可读分别抛出可区分异常。 */
+    private static void validateRootDir(Path rootDir) {
+        if (!java.nio.file.Files.exists(rootDir)) {
+            throw new InvalidRootDirException(InvalidRootDirException.Reason.NOT_EXISTS, rootDir);
+        }
+        if (!java.nio.file.Files.isDirectory(rootDir)) {
+            throw new InvalidRootDirException(InvalidRootDirException.Reason.NOT_A_DIRECTORY, rootDir);
+        }
+        if (!java.nio.file.Files.isReadable(rootDir)) {
+            throw new InvalidRootDirException(InvalidRootDirException.Reason.UNREADABLE, rootDir);
         }
     }
 }
